@@ -32,12 +32,14 @@ struct ContentView: View {
                 .help(viewModel.showingCompleted ? "Hide completed tickets" : "Show completed tickets")
                 
                 Button(action: {
-                    viewModel.refreshTickets()
+                    // Option-click to force reset
+                    let forceReset = NSEvent.modifierFlags.contains(.option)
+                    viewModel.refreshTickets(forceReset: forceReset)
                 }) {
                     Image(systemName: "arrow.clockwise")
                 }
                 .buttonStyle(BorderlessButtonStyle())
-                .help("Refresh tickets")
+                .help("Refresh tickets (Option-click to force reset)")
             }
             .padding()
             .background(Color(NSColor.windowBackgroundColor))
@@ -148,6 +150,8 @@ struct ContentView: View {
             NSApplication.shared.terminate(nil)
         }
     }
+    
+
 }
 
 struct TicketRow: View {

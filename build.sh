@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -e 
 # Create app bundle structure
 mkdir -p TicketTracker.app/Contents/MacOS
 mkdir -p TicketTracker.app/Contents/Resources

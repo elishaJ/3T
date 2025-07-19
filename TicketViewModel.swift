@@ -63,48 +63,75 @@ class TicketViewModel: ObservableObject {
         }
     }
     
-    func refreshTickets() {
+    func refreshTickets(forceReset: Bool = false) {
         guard isAuthenticated else { return }
+        
+        // If forceReset is true, clear all stored tickets
+        if forceReset {
+            storage.clearAllTickets()
+            tickets = []
+            completedTickets = []
+        }
+        
+        // Always start with an empty tickets array
+        tickets = []
         
         isLoading = true
         asanaService.fetchTickets { [weak self] result in
             DispatchQueue.main.async {
-                self?.isLoading = false
+                guard let self = self else { return }
+                self.isLoading = false
                 switch result {
                 case .success(let fetchedTickets):
-                    // Preserve tracking state for existing tickets
-                    var updatedTickets = fetchedTickets
+                    print("Fetched \(fetchedTickets.count) tickets from Asana")
                     
-                    // Check both active and completed tickets for existing data
-                    for i in 0..<updatedTickets.count {
-                        // Check active tickets
-                        if let existingTicket = self?.tickets.first(where: { $0.id == updatedTickets[i].id }) {
-                            updatedTickets[i].status = existingTicket.status
-                            updatedTickets[i].timeSpent = existingTicket.timeSpent
-                        } 
-                        // Check completed tickets
-                        else if let completedTicket = self?.completedTickets.first(where: { $0.id == updatedTickets[i].id }) {
-                            // If it's in completed list, don't add it to active tickets
-                            updatedTickets[i].status = .completed
-                            updatedTickets[i].timeSpent = completedTicket.timeSpent
+                    // If we're doing a force reset, don't load saved tickets
+                    let savedTickets = forceReset ? [] : self.storage.loadTickets()
+                    
+                    // Create new tickets array with only tickets from Asana
+                    var newTickets: [Ticket] = []
+                    
+                    // Process each fetched ticket from Asana
+                    for var fetchedTicket in fetchedTickets {
+                        // Check if this ticket exists in saved tickets (active or completed)
+                        if let existingTicket = savedTickets.first(where: { $0.id == fetchedTicket.id }) {
+                            // Preserve time spent and status
+                            fetchedTicket.timeSpent = existingTicket.timeSpent
+                            
+                            // Only apply status if it's not completed
+                            if existingTicket.status != .completed {
+                                fetchedTicket.status = existingTicket.status
+                            } else {
+                                // Skip this ticket if it's completed
+                                continue
+                            }
                         }
+                        
+                        // Add to new tickets list
+                        newTickets.append(fetchedTicket)
                     }
                     
-                    // Filter out tickets that are already in completed section
-                    let activeTickets = updatedTickets.filter { ticket in
-                        !self!.completedTickets.contains(where: { $0.id == ticket.id })
+                    // Update active tickets with only those from Asana
+                    self.tickets = newTickets
+                    
+                    // Keep completed tickets as they were (unless we're doing a force reset)
+                    if !forceReset {
+                        self.completedTickets = savedTickets.filter { $0.status == .completed }
                     }
                     
-                    self?.tickets = activeTickets
-                    self?.saveTickets()
+                    print("Active tickets: \(self.tickets.count), Completed tickets: \(self.completedTickets.count)")
+                    
+                    // Save the updated tickets
+                    self.saveTickets()
+                    
                 case .failure(let error):
                     print("Error fetching tickets: \(error.localizedDescription)")
                     
                     // Check if it's an authentication error
                     if (error as NSError).domain == "AsanaService" && (error as NSError).code == 401 {
                         // Try to refresh authentication
-                        self?.isAuthenticated = false
-                        self?.refreshAuthenticationIfNeeded()
+                        self.isAuthenticated = false
+                        self.refreshAuthenticationIfNeeded()
                     }
                 }
             }
@@ -160,6 +187,15 @@ class TicketViewModel: ObservableObject {
         isAuthenticated = false
         tickets = []
         completedTickets = []
+    }
+    
+    // For debugging purposes only
+    func clearLocalCache() {
+        // Clear local ticket cache but keep authentication
+        tickets = []
+        completedTickets = []
+        storage.clearAllTickets()
+        print("Local ticket cache cleared")
     }
     
     private func startTimer() {

@@ -57,4 +57,8 @@ class TicketStorage {
     func clearCookie() {
         userDefaults.removeObject(forKey: cookieKey)
     }
+    
+    func clearAllTickets() {
+        userDefaults.removeObject(forKey: ticketsKey)
+    }
 }
