@@ -15,31 +15,34 @@ struct ContentView: View {
                     }
                 Spacer()
                 
-                Button(action: {
-                    confirmClearAuthentication()
-                }) {
-                    Image(systemName: "person.crop.circle.badge.xmark")
+                // Only show these buttons when authenticated
+                if viewModel.isAuthenticated {
+                    Button(action: {
+                        confirmClearAuthentication()
+                    }) {
+                        Image(systemName: "person.crop.circle.badge.xmark")
+                    }
+                    .buttonStyle(BorderlessButtonStyle())
+                    .help("Clear authentication")
+                    
+                    Button(action: {
+                        viewModel.toggleCompletedVisibility()
+                    }) {
+                        Image(systemName: viewModel.showingCompleted ? "eye.slash" : "eye")
+                    }
+                    .buttonStyle(BorderlessButtonStyle())
+                    .help(viewModel.showingCompleted ? "Hide completed tickets" : "Show completed tickets")
+                    
+                    Button(action: {
+                        // Option-click to force reset
+                        let forceReset = NSEvent.modifierFlags.contains(.option)
+                        viewModel.refreshTickets(forceReset: forceReset)
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(BorderlessButtonStyle())
+                    .help("Refresh tickets (Option-click to force reset)")
                 }
-                .buttonStyle(BorderlessButtonStyle())
-                .help("Clear authentication")
-                
-                Button(action: {
-                    viewModel.toggleCompletedVisibility()
-                }) {
-                    Image(systemName: viewModel.showingCompleted ? "eye.slash" : "eye")
-                }
-                .buttonStyle(BorderlessButtonStyle())
-                .help(viewModel.showingCompleted ? "Hide completed tickets" : "Show completed tickets")
-                
-                Button(action: {
-                    // Option-click to force reset
-                    let forceReset = NSEvent.modifierFlags.contains(.option)
-                    viewModel.refreshTickets(forceReset: forceReset)
-                }) {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .buttonStyle(BorderlessButtonStyle())
-                .help("Refresh tickets (Option-click to force reset)")
             }
             .padding()
             .background(Color(NSColor.windowBackgroundColor))
@@ -56,13 +59,24 @@ struct ContentView: View {
                     .padding()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !viewModel.isAuthenticated {
-                VStack {
-                    Text("Not connected to Asana")
+                VStack(spacing: 16) {
+                    Image(systemName: "link.badge.plus")
+                        .font(.system(size: 48))
+                        .foregroundColor(.blue)
+                    
+                    Text("Connect to Asana")
+                        .font(.headline)
+                    
+                    Text("Sign in to track time on your Asana tickets")
                         .foregroundColor(.secondary)
-                    Button("Connect to Asana") {
+                        .multilineTextAlignment(.center)
+                    
+                    Button("Sign In") {
                         viewModel.authenticate()
                     }
-                    .padding(.top)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .padding(.top, 8)
                 }
                 .padding()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
