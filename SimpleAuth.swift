@@ -2,8 +2,11 @@ import Foundation
 import AppKit
 
 class SimpleAuth: NSObject, NSWindowDelegate {
+    // Flag to track if validation is in progress
+    private var isValidating = false
     private var window: NSWindow?
     private var textField: NSTextField?
+    private var errorLabel: NSTextField?
     private var completion: ((String?) -> Void)?
     
     func authenticate(completion: @escaping (String?) -> Void) {
@@ -59,15 +62,30 @@ class SimpleAuth: NSObject, NSWindowDelegate {
         contentView.addSubview(textField)
         self.textField = textField
         
+        // Add error label (hidden by default)
+        let errorLabel = NSTextField(frame: NSRect(x: 20, y: 40, width: 460, height: 30))
+        errorLabel.isEditable = false
+        errorLabel.isSelectable = false
+        errorLabel.drawsBackground = false
+        errorLabel.isBezeled = false
+        errorLabel.textColor = NSColor.systemRed
+        errorLabel.font = NSFont.systemFont(ofSize: 11)
+        errorLabel.cell?.wraps = true
+        errorLabel.cell?.lineBreakMode = .byWordWrapping
+        errorLabel.stringValue = ""
+        errorLabel.isHidden = true
+        contentView.addSubview(errorLabel)
+        self.errorLabel = errorLabel
+        
         // Add buttons
-        let okButton = NSButton(frame: NSRect(x: 380, y: 20, width: 100, height: 32))
+        let okButton = NSButton(frame: NSRect(x: 380, y: 10, width: 100, height: 32))
         okButton.title = "OK"
         okButton.bezelStyle = .rounded
         okButton.target = self
         okButton.action = #selector(okButtonClicked)
         contentView.addSubview(okButton)
         
-        let cancelButton = NSButton(frame: NSRect(x: 280, y: 20, width: 100, height: 32))
+        let cancelButton = NSButton(frame: NSRect(x: 280, y: 10, width: 100, height: 32))
         cancelButton.title = "Cancel"
         cancelButton.bezelStyle = .rounded
         cancelButton.target = self
@@ -91,44 +109,100 @@ class SimpleAuth: NSObject, NSWindowDelegate {
         
         if cookie.isEmpty {
             // Show error for empty cookie
-            let alert = NSAlert()
-            alert.messageText = "Empty Cookie"
-            alert.informativeText = "Please enter a cookie value."
-            alert.alertStyle = .warning
-            
-            // Make sure the alert appears on top
-            alert.window.level = .floating
-            alert.beginSheetModal(for: window!) { _ in }
+            showError("Please enter a cookie value.")
             return
         }
         
         if cookie.count < 20 {
             // Show error for short cookie
-            let alert = NSAlert()
-            alert.messageText = "Cookie Too Short"
-            alert.informativeText = "The cookie you entered appears to be too short. Please make sure you've copied the entire cookie value from the Request Headers."
-            alert.alertStyle = .warning
-            
-            // Make sure the alert appears on top
-            alert.window.level = .floating
-            alert.beginSheetModal(for: window!) { _ in }
+            showError("The cookie you entered appears to be too short. Please make sure you've copied the entire cookie value from the Request Headers.")
             return
         }
+        
+        // Show validating message
+        showError("Validating cookie...", isError: false)
         
         // Store the completion and cookie locally
         guard let completion = self.completion else { return }
         let localCookie = cookie
         
-        // Clear the completion to prevent double-calling
-        self.completion = nil
-        
-        // Hide the window
-        window?.orderOut(nil)
-        
-        // Call completion with the cookie
-        DispatchQueue.main.async {
-            completion(localCookie)
+        // Validate the cookie
+        validateCookie(cookie) { [weak self] isValid in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                
+                if isValid {
+                    // Cookie is valid
+                    // Clear the completion to prevent double-calling
+                    self.completion = nil
+                    
+                    // Hide the window
+                    self.window?.orderOut(nil)
+                    
+                    // Call completion with the cookie
+                    completion(localCookie)
+                } else {
+                    // Cookie is invalid, show error
+                    self.showError("The cookie appears to be invalid. Please review the instructions above and try again.")
+                }
+            }
         }
+    }
+    
+    private func showError(_ message: String, isError: Bool = true) {
+        guard let errorLabel = self.errorLabel else { return }
+        
+        // Show the error message
+        errorLabel.stringValue = isError ? "🚫 " + message : message
+        errorLabel.isHidden = false
+        errorLabel.textColor = isError ? NSColor.systemRed : NSColor.systemBlue
+        
+        // Add a text field action to clear the error when typing
+        textField?.action = #selector(textFieldChanged)
+        textField?.target = self
+    }
+    
+    @objc func textFieldChanged() {
+        // Clear the error when the user types (but not during validation)
+        if !isValidating {
+            errorLabel?.isHidden = true
+        }
+    }
+    
+    private func validateCookie(_ cookie: String, completion: @escaping (Bool) -> Void) {
+        // Set validation flag
+        isValidating = true
+        
+        // Create a simple request to validate the cookie
+        let endpoint = "https://app.asana.com/api/1.0/users/me"
+        
+        guard let url = URL(string: endpoint) else {
+            isValidating = false
+            completion(false)
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.addValue(cookie, forHTTPHeaderField: "Cookie")
+        request.addValue("application/json", forHTTPHeaderField: "Accept")
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            // Reset validation flag
+            self?.isValidating = false
+            
+            // Check if we got a successful response
+            if let httpResponse = response as? HTTPURLResponse, 
+               httpResponse.statusCode == 200,
+               let data = data,
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let userData = json["data"] as? [String: Any],
+               userData["gid"] != nil {
+                completion(true)
+            } else {
+                completion(false)
+            }
+        }.resume()
     }
     
     @objc func cancelButtonClicked() {

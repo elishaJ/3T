@@ -12,10 +12,9 @@ class TicketViewModel: ObservableObject {
     @Published var projectName: String = "Tickets"
     @Published var showingSettings = false
     
-    // Function to show settings in a floating window
+    // Function to show settings
     func showSettings() {
-        settingsWindowController = SettingsWindowController(viewModel: self)
-        settingsWindowController?.showWindow()
+        showingSettings = true
     }
     
     private var timer: Timer?
@@ -78,13 +77,11 @@ class TicketViewModel: ObservableObject {
     }
     
     func checkAuthenticationStatus() {
+        // First check if we have a cookie stored
         isAuthenticated = asanaService.isAuthenticated
-        if isAuthenticated && !projectId.isEmpty {
-            // Fetch the project name
-            fetchProjectName()
-            // Validate the cookie by trying to fetch tickets
-            refreshTickets(silent: true)
-        }
+        
+        // Don't automatically validate on startup - just set the flag
+        // The UI will show the appropriate state based on isAuthenticated
     }
     
     func refreshAuthenticationIfNeeded() {
@@ -115,7 +112,6 @@ class TicketViewModel: ObservableObject {
                 self.authService = nil
                 
                 let success = cookie != nil
-                self.isAuthenticated = success
                 
                 if success {
                     // Save the cookie
@@ -123,19 +119,39 @@ class TicketViewModel: ObservableObject {
                         self.asanaService.saveCookie(cookie)
                     }
                     
-                    // Add a delay before refreshing tickets
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        if self.projectId.isEmpty {
-                            // If no project ID is set, show settings
-                            self.showSettings()
-                        } else {
-                            // Otherwise refresh tickets
-                            self.refreshTickets()
+                    // Validate the authentication
+                    self.asanaService.validateAuthentication { isValid in
+                        DispatchQueue.main.async {
+                            if isValid {
+                                // Authentication is valid
+                                self.isAuthenticated = true
+                                
+                                // Post notification that authentication succeeded
+                                // This will make the app window appear
+                                AppNotificationCenter.shared.postAuthenticationSuccess()
+                                
+                                // Check if project ID is set
+                                if self.projectId.isEmpty {
+                                    // Show settings to set project ID
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        self.showSettings()
+                                    }
+                                } else {
+                                    // Project ID exists, refresh tickets
+                                    self.refreshTickets()
+                                }
+                            } else {
+                                // Authentication is invalid
+                                self.isAuthenticated = false
+                                let alert = NSAlert()
+                                alert.messageText = "Authentication Failed"
+                                alert.informativeText = "The cookie you provided is invalid. Please try again with a fresh cookie."
+                                alert.alertStyle = .warning
+                                
+                                // Run the alert as a floating window
+                                alert.runModalAsFloating()
+                            }
                         }
-                        
-                        // Post notification that authentication succeeded
-                        // This will also make the app window appear
-                        AppNotificationCenter.shared.postAuthenticationSuccess()
                     }
                 } else {
                     // Show a consistent error message for all authentication issues
@@ -150,6 +166,8 @@ class TicketViewModel: ObservableObject {
             }
         }
     }
+    
+    // This method has been replaced by logic in the authenticate method
     
     func refreshTickets(forceReset: Bool = false, silent: Bool = false) {
         guard isAuthenticated else { return }

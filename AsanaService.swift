@@ -50,7 +50,7 @@ class AsanaService: NSObject {
         }
     }
     
-    private func validateAuthentication(completion: @escaping (Bool) -> Void) {
+    func validateAuthentication(completion: @escaping (Bool) -> Void) {
         // Make a simple request to verify the cookie is valid
         let endpoint = "\(baseURL)/users/me"
         

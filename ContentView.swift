@@ -19,17 +19,18 @@ struct ContentView: View {
                     }
                 Spacer()
                 
-                // Settings button is always visible
-                Button(action: {
-                    viewModel.showSettings()
-                }) {
-                    Image(systemName: "gear")
-                }
-                .buttonStyle(BorderlessButtonStyle())
-                .help("Settings")
-                
-                // Only show these buttons when authenticated
+                // Only show buttons when authenticated
                 if viewModel.isAuthenticated {
+                    // Settings button
+                    Button(action: {
+                        viewModel.showSettings()
+                    }) {
+                        Image(systemName: "gear")
+                    }
+                    .buttonStyle(BorderlessButtonStyle())
+                    .help("Settings")
+                    
+                    // Logout button
                     Button(action: {
                         confirmClearAuthentication()
                     }) {
@@ -38,6 +39,7 @@ struct ContentView: View {
                     .buttonStyle(BorderlessButtonStyle())
                     .help("Clear authentication")
                     
+                    // Toggle completed tickets visibility
                     Button(action: {
                         viewModel.toggleCompletedVisibility()
                     }) {
@@ -46,6 +48,7 @@ struct ContentView: View {
                     .buttonStyle(BorderlessButtonStyle())
                     .help(viewModel.showingCompleted ? "Hide completed tickets" : "Show completed tickets")
                     
+                    // Refresh button
                     Button(action: {
                         // Option-click to force reset
                         let forceReset = NSEvent.modifierFlags.contains(.option)
@@ -94,28 +97,17 @@ struct ContentView: View {
                 .padding()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.tickets.isEmpty {
-                VStack {
-                    if viewModel.projectId.isEmpty {
-                        Text("No project ID configured")
-                            .foregroundColor(.secondary)
-                        Button("Configure Project ID") {
-                            viewModel.showSettings()
-                        }
-                        .padding(.top)
-                    } else {
-                        VStack(spacing: 8) {
-                            Text("No tickets found")
-                                .foregroundColor(.secondary)
-                            Text("Make sure you have tickets in the 'In Progress' section of your Asana project")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                            Button("Refresh Tickets") {
-                                viewModel.refreshTickets()
-                            }
-                            .padding(.top)
-                        }
+                VStack(spacing: 8) {
+                    Text("No tickets found")
+                        .foregroundColor(.secondary)
+                    Text("Make sure you have tickets in the 'In Progress' section of your Asana project")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Refresh Tickets") {
+                        viewModel.refreshTickets()
                     }
+                    .padding(.top)
                 }
                 .padding()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -162,6 +154,9 @@ struct ContentView: View {
             }
         }
         .frame(width: 320, height: 400)
+        .sheet(isPresented: $viewModel.showingSettings) {
+            SettingsView(viewModel: viewModel)
+        }
         .onAppear {
             viewModel.checkAuthenticationStatus()
         }

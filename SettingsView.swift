@@ -4,13 +4,10 @@ import AppKit
 struct SettingsView: View {
     @ObservedObject var viewModel: TicketViewModel
     @State private var tempProjectId: String = ""
+    @State private var errorMessage: String = ""
+    @State private var showError: Bool = false
     
-    // Function to close the window
-    private func closeWindow() {
-        if let window = NSApplication.shared.windows.first(where: { $0.title == "Settings" }) {
-            window.close()
-        }
-    }
+    @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
         VStack(spacing: 20) {
@@ -24,6 +21,17 @@ struct SettingsView: View {
                 
                 TextField("Enter Asana Project ID", text: $tempProjectId)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .onChange(of: tempProjectId) { _ in
+                        // Clear error when user types
+                        showError = false
+                    }
+                
+                if showError {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .padding(.top, 4)
+                }
                 
                 Text("You can find your project ID in the URL when viewing the project in Asana (e.g., https://app.asana.com/0/123456789/list - where 123456789 is the project ID)")
                     .font(.caption)
@@ -34,7 +42,7 @@ struct SettingsView: View {
             
             HStack {
                 Button("Cancel") {
-                    closeWindow()
+                    presentationMode.wrappedValue.dismiss()
                 }
                 .keyboardShortcut(.escape)
                 
@@ -50,7 +58,7 @@ struct SettingsView: View {
                                     DispatchQueue.main.async {
                                         viewModel.projectId = tempProjectId
                                         viewModel.saveProjectId()
-                                        closeWindow()
+                                        presentationMode.wrappedValue.dismiss()
                                         
                                         // Refresh tickets after a short delay
                                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -61,14 +69,9 @@ struct SettingsView: View {
                                     }
                                 } else {
                                     DispatchQueue.main.async {
-                                        // Show error for invalid project ID
-                                        let alert = NSAlert()
-                                        alert.messageText = "Project Not Found"
-                                        alert.informativeText = "The project ID you entered was not found in your accessible projects. Please check the ID and try again."
-                                        alert.alertStyle = .warning
-                                        
-                                        // Run the alert as a floating window
-                                        alert.runModalAsFloating()
+                                        // Show error in the view
+                                        errorMessage = "🚫 Project ID not found. Please review the instructions and try again."
+                                        showError = true
                                     }
                                 }
                             }
@@ -76,17 +79,12 @@ struct SettingsView: View {
                             // Not authenticated, just save the ID without validation
                             viewModel.projectId = tempProjectId
                             viewModel.saveProjectId()
-                            closeWindow()
+                            presentationMode.wrappedValue.dismiss()
                         }
                     } else {
-                        // Show error for invalid project ID format
-                        let alert = NSAlert()
-                        alert.messageText = "Invalid Project ID Format"
-                        alert.informativeText = "Project ID should contain only numbers. Please check the ID and try again."
-                        alert.alertStyle = .warning
-                        
-                        // Run the alert as a floating window
-                        alert.runModalAsFloating()
+                        // Show error in the view
+                        errorMessage = "🚫 Project ID should contain only numbers. Please try again."
+                        showError = true
                     }
                 }
                 .keyboardShortcut(.return)
@@ -97,13 +95,6 @@ struct SettingsView: View {
         .frame(width: 400, height: 250)
         .onAppear {
             tempProjectId = viewModel.projectId
-            
-            // Make sure the settings window stays on top
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                if let window = NSApplication.shared.windows.first(where: { $0.title == "Settings" }) {
-                    window.level = .floating
-                }
-            }
         }
     }
 }

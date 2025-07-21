@@ -54,7 +54,7 @@ swiftc -o TicketTracker.app/Contents/MacOS/TicketTracker \
     NotificationCenter.swift \
     SettingsView.swift \
     NSAlertExtension.swift \
-    SettingsWindowController.swift
+    AlertManager.swift
 
 # Make executable
 chmod +x TicketTracker.app/Contents/MacOS/TicketTracker

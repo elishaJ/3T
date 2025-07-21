@@ -1,12 +1,16 @@
 import AppKit
 
 extension NSAlert {
-    // Run the alert as a floating window that stays on top
     func runModalAsFloating() -> NSApplication.ModalResponse {
-        // Make sure the alert window is on top
-        self.window.level = .floating
+        // Save the current key window
+        let keyWindow = NSApplication.shared.keyWindow
         
         // Run the alert modally
-        return self.runModal()
+        let response = self.runModal()
+        
+        // Restore the key window
+        keyWindow?.makeKeyAndOrderFront(nil)
+        
+        return response
     }
 }
