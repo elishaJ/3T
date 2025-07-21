@@ -7,6 +7,9 @@ class TicketViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var isAuthenticated = false
     @Published var showingCompleted = false
+    @Published var projectId: String = ""
+    @Published var projectName: String = "Tickets"
+    @Published var showingSettings = false
     
     private var timer: Timer?
     private let asanaService = AsanaService()
@@ -14,7 +17,43 @@ class TicketViewModel: ObservableObject {
     
     init() {
         loadSavedTickets()
+        loadProjectId()
         startTimer()
+    }
+    
+    private func loadProjectId() {
+        projectId = storage.loadProjectId() ?? ""
+    }
+    
+    func saveProjectId() {
+        // Save the project ID to storage
+        storage.saveProjectId(projectId)
+        
+        // Clear any cached data related to the old project ID
+        tickets = []
+        completedTickets = []
+        projectName = "Tickets"
+        
+        // Fetch the project name for the new project ID
+        fetchProjectName()
+    }
+    
+    func validateProjectId(_ projectId: String, completion: @escaping (Bool) -> Void) {
+        asanaService.validateProjectId(projectId, completion: completion)
+    }
+    
+    func fetchProjectName() {
+        guard !projectId.isEmpty, isAuthenticated else { return }
+        
+        asanaService.fetchProjectName(projectId: projectId) { [weak self] name in
+            DispatchQueue.main.async {
+                if let name = name {
+                    self?.projectName = name
+                    // Post notification for project name change
+                    NotificationCenter.default.post(name: NSNotification.Name("ProjectNameChanged"), object: name)
+                }
+            }
+        }
     }
     
     private func loadSavedTickets() {
@@ -33,9 +72,11 @@ class TicketViewModel: ObservableObject {
     
     func checkAuthenticationStatus() {
         isAuthenticated = asanaService.isAuthenticated
-        if isAuthenticated {
+        if isAuthenticated && !projectId.isEmpty {
+            // Fetch the project name
+            fetchProjectName()
             // Validate the cookie by trying to fetch tickets
-            refreshTickets()
+            refreshTickets(silent: true)
         }
     }
     
@@ -50,21 +91,60 @@ class TicketViewModel: ObservableObject {
         }
     }
     
+    // Keep a strong reference to the auth object
+    private var authService: SimpleAuth?
+    
     func authenticate() {
-        asanaService.authenticate { [weak self] success in
+        // Create a new auth service and keep a strong reference to it
+        let auth = SimpleAuth()
+        self.authService = auth
+        
+        auth.authenticate { [weak self] cookie in
+            // Make sure we're on the main thread
             DispatchQueue.main.async {
-                self?.isAuthenticated = success
+                guard let self = self else { return }
+                
+                // Clear the reference to the auth service
+                self.authService = nil
+                
+                let success = cookie != nil
+                self.isAuthenticated = success
+                
                 if success {
-                    self?.refreshTickets()
-                    // Post notification that authentication succeeded
-                    AppNotificationCenter.shared.postAuthenticationSuccess()
+                    // Save the cookie
+                    if let cookie = cookie {
+                        self.asanaService.saveCookie(cookie)
+                    }
+                    
+                    // Add a delay before refreshing tickets
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        if self.projectId.isEmpty {
+                            // If no project ID is set, show settings
+                            self.showingSettings = true
+                        } else {
+                            // Otherwise refresh tickets
+                            self.refreshTickets()
+                        }
+                        
+                        // Post notification that authentication succeeded
+                        // This will also make the app window appear
+                        AppNotificationCenter.shared.postAuthenticationSuccess()
+                    }
+                } else {
+                    // Show a consistent error message for all authentication issues
+                    let alert = NSAlert()
+                    alert.messageText = "Authentication Failed"
+                    alert.informativeText = "Please make sure you've copied the correct cookie from Asana. Try logging in again and fetching a new cookie."
+                    alert.alertStyle = .warning
+                    alert.runModal()
                 }
             }
         }
     }
     
-    func refreshTickets(forceReset: Bool = false) {
+    func refreshTickets(forceReset: Bool = false, silent: Bool = false) {
         guard isAuthenticated else { return }
+        guard !projectId.isEmpty else { return }
         
         // If forceReset is true, clear all stored tickets
         if forceReset {
@@ -127,11 +207,44 @@ class TicketViewModel: ObservableObject {
                 case .failure(let error):
                     print("Error fetching tickets: \(error.localizedDescription)")
                     
-                    // Check if it's an authentication error
-                    if (error as NSError).domain == "AsanaService" && (error as NSError).code == 401 {
-                        // Try to refresh authentication
-                        self.isAuthenticated = false
-                        self.refreshAuthenticationIfNeeded()
+                    // Check error type
+                    let nsError = error as NSError
+                    if nsError.domain == "AsanaService" {
+                        if nsError.code == 401 {
+                            // Authentication error
+                            self.isAuthenticated = false
+                            
+                            // Only show alert if not in silent mode
+                            if !silent {
+                                // Show session expired alert
+                                let alert = NSAlert()
+                                alert.messageText = "Authentication Failed"
+                                alert.informativeText = "Please make sure you've copied the correct cookie from Asana. Try logging in again and fetching a new cookie."
+                                alert.alertStyle = .warning
+                                alert.addButton(withTitle: "Sign In")
+                                alert.addButton(withTitle: "Cancel")
+                                
+                                let response = alert.runModal()
+                                if response == .alertFirstButtonReturn {
+                                    self.authenticate()
+                                }
+                            }
+                        } else if nsError.code == 404 {
+                            // Project not found error
+                            if !silent {
+                                let alert = NSAlert()
+                                alert.messageText = "Project Not Found"
+                                alert.informativeText = "The project ID you entered was not found. Please check your project ID in the settings."
+                                alert.alertStyle = .warning
+                                alert.addButton(withTitle: "Open Settings")
+                                alert.addButton(withTitle: "Cancel")
+                                
+                                let response = alert.runModal()
+                                if response == .alertFirstButtonReturn {
+                                    self.showingSettings = true
+                                }
+                            }
+                        }
                     }
                 }
             }

@@ -29,6 +29,7 @@ class TicketStorage {
     private let userDefaults = UserDefaults.standard
     private let ticketsKey = "savedTickets"
     private let cookieKey = "asanaCookie"
+    private let projectIdKey = "asanaProjectId"
     
     func saveTickets(_ tickets: [Ticket]) {
         let ticketData = tickets.map { TicketData(from: $0) }
@@ -60,5 +61,13 @@ class TicketStorage {
     
     func clearAllTickets() {
         userDefaults.removeObject(forKey: ticketsKey)
+    }
+    
+    func saveProjectId(_ projectId: String) {
+        userDefaults.set(projectId, forKey: projectIdKey)
+    }
+    
+    func loadProjectId() -> String? {
+        return userDefaults.string(forKey: projectIdKey)
     }
 }

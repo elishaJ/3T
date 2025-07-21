@@ -6,14 +6,26 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Ticket Tracker")
-                    .font(.headline)
+                HStack(spacing: 4) {
+                    Text("⏱️")
+                    Text("Ticket Tracker")
+                        .font(.headline)
+                }
                     .contextMenu {
                         Button("Quit") {
                             confirmQuit()
                         }
                     }
                 Spacer()
+                
+                // Settings button is always visible
+                Button(action: {
+                    viewModel.showingSettings = true
+                }) {
+                    Image(systemName: "gear")
+                }
+                .buttonStyle(BorderlessButtonStyle())
+                .help("Settings")
                 
                 // Only show these buttons when authenticated
                 if viewModel.isAuthenticated {
@@ -82,23 +94,48 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.tickets.isEmpty {
                 VStack {
-                    Text("No tickets found")
-                        .foregroundColor(.secondary)
-                    Button("Refresh Tickets") {
-                        viewModel.refreshTickets()
+                    if viewModel.projectId.isEmpty {
+                        Text("No project ID configured")
+                            .foregroundColor(.secondary)
+                        Button("Configure Project ID") {
+                            viewModel.showingSettings = true
+                        }
+                        .padding(.top)
+                    } else {
+                        VStack(spacing: 8) {
+                            Text("No tickets found")
+                                .foregroundColor(.secondary)
+                            Text("Make sure you have tickets in the 'In Progress' section of your Asana project")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                            Button("Refresh Tickets") {
+                                viewModel.refreshTickets()
+                            }
+                            .padding(.top)
+                        }
                     }
-                    .padding(.top)
                 }
                 .padding()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
-                    Section(header: HStack {
-                        Text("Active Tickets")
-                        Spacer()
-                        Text(getCurrentDateString())
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    Section(header: VStack(alignment: .leading, spacing: 6) {
+                        if !viewModel.projectName.isEmpty && viewModel.projectName != "Tickets" {
+                            Text(viewModel.projectName)
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                        }
+                        
+                        HStack {
+                            Text("Active Tickets")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text(getCurrentDateString())
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }) {
                         if viewModel.tickets.isEmpty {
                             Text("No active tickets")
@@ -112,7 +149,9 @@ struct ContentView: View {
                     }
                     
                     if viewModel.showingCompleted && !viewModel.completedTickets.isEmpty {
-                        Section(header: Text("Completed Tickets")) {
+                        Section(header: Text("Completed Tickets")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)) {
                             ForEach(viewModel.completedTickets) { ticket in
                                 CompletedTicketRow(ticket: ticket, viewModel: viewModel)
                             }
@@ -122,6 +161,9 @@ struct ContentView: View {
             }
         }
         .frame(width: 320, height: 400)
+        .sheet(isPresented: $viewModel.showingSettings) {
+            SettingsView(viewModel: viewModel)
+        }
         .onAppear {
             viewModel.checkAuthenticationStatus()
         }
@@ -138,7 +180,7 @@ struct ContentView: View {
     // Show confirmation dialog before clearing authentication
     private func confirmClearAuthentication() {
         let alert = NSAlert()
-        alert.messageText = "Clear Authentication?"
+        alert.messageText = "Clear Cookie?"
         alert.informativeText = "This will log you out of Asana. You'll need to log in again to see your tickets."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Clear")
