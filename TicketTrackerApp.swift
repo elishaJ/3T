@@ -52,13 +52,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Create the status bar item
         statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
+        // Create a menu with just the quit item
+        let menu = NSMenu()
+        menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q"))
+        
+        // Set the image and action
         if let button = statusBarItem.button {
             button.image = NSImage(systemSymbolName: "ticket", accessibilityDescription: "Ticket Tracker")
-            button.action = #selector(togglePopover)
+            button.action = #selector(handleStatusItemClick(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
     }
     
-    @objc func togglePopover() {
+    @objc func handleStatusItemClick(_ sender: NSStatusBarButton) {
+        if let event = NSApp.currentEvent {
+            if event.type == .rightMouseUp {
+                // Show menu on right-click
+                let menu = NSMenu()
+                menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q"))
+                statusBarItem.menu = menu
+                statusBarItem.button?.performClick(nil)
+                statusBarItem.menu = nil
+            } else {
+                // Toggle popover on left-click
+                togglePopover()
+            }
+        }
+    }
+    
+    func togglePopover() {
         if let button = statusBarItem.button {
             if popover.isShown {
                 popover.performClose(nil)
@@ -68,6 +90,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
     }
+    
+    @objc func quitApp() {
+        NSApplication.shared.terminate(nil)
+    }
+    
+
     
     @objc func updateWindowTitle(notification: Notification) {
         if let projectName = notification.object as? String {
