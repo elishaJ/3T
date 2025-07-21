@@ -79,14 +79,9 @@ class SimpleAuth: NSObject, NSWindowDelegate {
         // Store the window reference
         self.window = window
         
-        // Show the window and make it stay on top initially
+        // Show the window and make it stay on top
         window.level = .floating
         window.makeKeyAndOrderFront(nil)
-        
-        // After a short delay, change the window level back to normal
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            window.level = .normal
-        }
     }
     
     @objc func okButtonClicked() {
@@ -100,6 +95,9 @@ class SimpleAuth: NSObject, NSWindowDelegate {
             alert.messageText = "Empty Cookie"
             alert.informativeText = "Please enter a cookie value."
             alert.alertStyle = .warning
+            
+            // Make sure the alert appears on top
+            alert.window.level = .floating
             alert.beginSheetModal(for: window!) { _ in }
             return
         }
@@ -110,6 +108,9 @@ class SimpleAuth: NSObject, NSWindowDelegate {
             alert.messageText = "Cookie Too Short"
             alert.informativeText = "The cookie you entered appears to be too short. Please make sure you've copied the entire cookie value from the Request Headers."
             alert.alertStyle = .warning
+            
+            // Make sure the alert appears on top
+            alert.window.level = .floating
             alert.beginSheetModal(for: window!) { _ in }
             return
         }

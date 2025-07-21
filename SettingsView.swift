@@ -1,9 +1,16 @@
 import SwiftUI
+import AppKit
 
 struct SettingsView: View {
     @ObservedObject var viewModel: TicketViewModel
-    @Environment(\.presentationMode) var presentationMode
     @State private var tempProjectId: String = ""
+    
+    // Function to close the window
+    private func closeWindow() {
+        if let window = NSApplication.shared.windows.first(where: { $0.title == "Settings" }) {
+            window.close()
+        }
+    }
     
     var body: some View {
         VStack(spacing: 20) {
@@ -27,7 +34,7 @@ struct SettingsView: View {
             
             HStack {
                 Button("Cancel") {
-                    presentationMode.wrappedValue.dismiss()
+                    closeWindow()
                 }
                 .keyboardShortcut(.escape)
                 
@@ -43,7 +50,7 @@ struct SettingsView: View {
                                     DispatchQueue.main.async {
                                         viewModel.projectId = tempProjectId
                                         viewModel.saveProjectId()
-                                        presentationMode.wrappedValue.dismiss()
+                                        closeWindow()
                                         
                                         // Refresh tickets after a short delay
                                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -59,7 +66,9 @@ struct SettingsView: View {
                                         alert.messageText = "Project Not Found"
                                         alert.informativeText = "The project ID you entered was not found in your accessible projects. Please check the ID and try again."
                                         alert.alertStyle = .warning
-                                        alert.runModal()
+                                        
+                                        // Run the alert as a floating window
+                                        alert.runModalAsFloating()
                                     }
                                 }
                             }
@@ -67,7 +76,7 @@ struct SettingsView: View {
                             // Not authenticated, just save the ID without validation
                             viewModel.projectId = tempProjectId
                             viewModel.saveProjectId()
-                            presentationMode.wrappedValue.dismiss()
+                            closeWindow()
                         }
                     } else {
                         // Show error for invalid project ID format
@@ -75,7 +84,9 @@ struct SettingsView: View {
                         alert.messageText = "Invalid Project ID Format"
                         alert.informativeText = "Project ID should contain only numbers. Please check the ID and try again."
                         alert.alertStyle = .warning
-                        alert.runModal()
+                        
+                        // Run the alert as a floating window
+                        alert.runModalAsFloating()
                     }
                 }
                 .keyboardShortcut(.return)
@@ -86,6 +97,13 @@ struct SettingsView: View {
         .frame(width: 400, height: 250)
         .onAppear {
             tempProjectId = viewModel.projectId
+            
+            // Make sure the settings window stays on top
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                if let window = NSApplication.shared.windows.first(where: { $0.title == "Settings" }) {
+                    window.level = .floating
+                }
+            }
         }
     }
 }

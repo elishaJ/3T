@@ -52,7 +52,9 @@ swiftc -o TicketTracker.app/Contents/MacOS/TicketTracker \
     CookieExtractor.swift \
     SimpleAuth.swift \
     NotificationCenter.swift \
-    SettingsView.swift
+    SettingsView.swift \
+    NSAlertExtension.swift \
+    SettingsWindowController.swift
 
 # Make executable
 chmod +x TicketTracker.app/Contents/MacOS/TicketTracker

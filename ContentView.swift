@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct ContentView: View {
     @StateObject private var viewModel = TicketViewModel()
@@ -20,7 +21,7 @@ struct ContentView: View {
                 
                 // Settings button is always visible
                 Button(action: {
-                    viewModel.showingSettings = true
+                    viewModel.showSettings()
                 }) {
                     Image(systemName: "gear")
                 }
@@ -98,7 +99,7 @@ struct ContentView: View {
                         Text("No project ID configured")
                             .foregroundColor(.secondary)
                         Button("Configure Project ID") {
-                            viewModel.showingSettings = true
+                            viewModel.showSettings()
                         }
                         .padding(.top)
                     } else {
@@ -161,9 +162,6 @@ struct ContentView: View {
             }
         }
         .frame(width: 320, height: 400)
-        .sheet(isPresented: $viewModel.showingSettings) {
-            SettingsView(viewModel: viewModel)
-        }
         .onAppear {
             viewModel.checkAuthenticationStatus()
         }
@@ -186,7 +184,8 @@ struct ContentView: View {
         alert.addButton(withTitle: "Clear")
         alert.addButton(withTitle: "Cancel")
         
-        let response = alert.runModal()
+        // Run the alert as a floating window
+        let response = alert.runModalAsFloating()
         if response == .alertFirstButtonReturn {
             viewModel.clearAuthentication()
         }
@@ -201,7 +200,8 @@ struct ContentView: View {
         alert.addButton(withTitle: "Quit")
         alert.addButton(withTitle: "Cancel")
         
-        let response = alert.runModal()
+        // Run the alert as a floating window
+        let response = alert.runModalAsFloating()
         if response == .alertFirstButtonReturn {
             NSApplication.shared.terminate(nil)
         }

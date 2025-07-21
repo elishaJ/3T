@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import AppKit
 
 class TicketViewModel: ObservableObject {
     @Published var tickets: [Ticket] = []
@@ -10,6 +11,12 @@ class TicketViewModel: ObservableObject {
     @Published var projectId: String = ""
     @Published var projectName: String = "Tickets"
     @Published var showingSettings = false
+    
+    // Function to show settings in a floating window
+    func showSettings() {
+        settingsWindowController = SettingsWindowController(viewModel: self)
+        settingsWindowController?.showWindow()
+    }
     
     private var timer: Timer?
     private let asanaService = AsanaService()
@@ -120,7 +127,7 @@ class TicketViewModel: ObservableObject {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         if self.projectId.isEmpty {
                             // If no project ID is set, show settings
-                            self.showingSettings = true
+                            self.showSettings()
                         } else {
                             // Otherwise refresh tickets
                             self.refreshTickets()
@@ -136,7 +143,9 @@ class TicketViewModel: ObservableObject {
                     alert.messageText = "Authentication Failed"
                     alert.informativeText = "Please make sure you've copied the correct cookie from Asana. Try logging in again and fetching a new cookie."
                     alert.alertStyle = .warning
-                    alert.runModal()
+                    
+                    // Run the alert as a floating window
+                    alert.runModalAsFloating()
                 }
             }
         }
@@ -216,7 +225,7 @@ class TicketViewModel: ObservableObject {
                             
                             // Only show alert if not in silent mode
                             if !silent {
-                                // Show session expired alert
+                                // Show session expired alert with custom buttons
                                 let alert = NSAlert()
                                 alert.messageText = "Authentication Failed"
                                 alert.informativeText = "Please make sure you've copied the correct cookie from Asana. Try logging in again and fetching a new cookie."
@@ -224,7 +233,8 @@ class TicketViewModel: ObservableObject {
                                 alert.addButton(withTitle: "Sign In")
                                 alert.addButton(withTitle: "Cancel")
                                 
-                                let response = alert.runModal()
+                                // Run the alert as a floating window
+                                let response = alert.runModalAsFloating()
                                 if response == .alertFirstButtonReturn {
                                     self.authenticate()
                                 }
@@ -239,9 +249,10 @@ class TicketViewModel: ObservableObject {
                                 alert.addButton(withTitle: "Open Settings")
                                 alert.addButton(withTitle: "Cancel")
                                 
-                                let response = alert.runModal()
+                                // Run the alert as a floating window
+                                let response = alert.runModalAsFloating()
                                 if response == .alertFirstButtonReturn {
-                                    self.showingSettings = true
+                                    self.showSettings()
                                 }
                             }
                         }

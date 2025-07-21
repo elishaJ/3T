@@ -165,7 +165,9 @@ class AsanaService: NSObject {
                         alert.messageText = "Authentication Failed"
                         alert.informativeText = "Please make sure you've copied the correct cookie from Asana. Try logging in again and fetching a new cookie."
                         alert.alertStyle = .warning
-                        alert.runModal()
+                        
+                        // Run the alert as a floating window
+                        alert.runModalAsFloating()
                     }
                     completion(false)
                     return
